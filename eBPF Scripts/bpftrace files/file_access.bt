@@ -1,0 +1,46 @@
+#!/usr/bin/env bpftrace
+/*
+File Access Trace - Monitor file open/close operations
+Outputs: timestamp, PID, process name, file path, operation type
+*/
+
+BEGIN
+{
+    @start_time = nsecs;
+    printf("{\"type\": \"trace_start\", \"timestamp\": %d}\n", @start_time);
+}
+
+tracepoint:syscalls:sys_enter_open
+{
+    printf("{\"event\": \"file_open\", \"timestamp\": %d, \"pid\": %d, \"comm\": \"%s\", \"filename\": \"%s\"}\n",
+        nsecs - @start_time, pid, comm, str(args->filename));
+}
+
+tracepoint:syscalls:sys_enter_openat
+{
+    printf("{\"event\": \"file_openat\", \"timestamp\": %d, \"pid\": %d, \"comm\": \"%s\", \"filename\": \"%s\"}\n",
+        nsecs - @start_time, pid, comm, str(args->filename));
+}
+
+tracepoint:syscalls:sys_enter_close
+{
+    printf("{\"event\": \"file_close\", \"timestamp\": %d, \"pid\": %d, \"comm\": \"%s\"}\n",
+        nsecs - @start_time, pid, comm);
+}
+
+tracepoint:syscalls:sys_enter_read
+{
+    printf("{\"event\": \"file_read\", \"timestamp\": %d, \"pid\": %d, \"comm\": \"%s\", \"fd\": %d}\n",
+        nsecs - @start_time, pid, comm, args->fd);
+}
+
+tracepoint:syscalls:sys_enter_write
+{
+    printf("{\"event\": \"file_write\", \"timestamp\": %d, \"pid\": %d, \"comm\": \"%s\", \"fd\": %d}\n",
+        nsecs - @start_time, pid, comm, args->fd);
+}
+
+END
+{
+    printf("{\"type\": \"trace_end\", \"timestamp\": %d}\n", nsecs);
+}

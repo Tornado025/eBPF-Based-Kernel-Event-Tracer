@@ -1,0 +1,44 @@
+#!/usr/bin/env bpftrace
+/*
+Memory Trace - Monitor memory allocation and deallocation
+Outputs: timestamp, PID, process name, allocation size, memory events
+*/
+
+BEGIN
+{
+    @start_time = nsecs;
+    printf("{\"type\": \"trace_start\", \"timestamp\": %d}\n", @start_time);
+}
+
+tracepoint:syscalls:sys_enter_mmap
+{
+    $len = args->len;
+    $flags = args->flags;
+    printf("{\"event\": \"mmap\", \"timestamp\": %d, \"pid\": %d, \"comm\": \"%s\", \"length\": %lu, \"flags\": %d}\n",
+        nsecs - @start_time, pid, comm, $len, $flags);
+}
+
+tracepoint:syscalls:sys_enter_munmap
+{
+    $len = args->len;
+    printf("{\"event\": \"munmap\", \"timestamp\": %d, \"pid\": %d, \"comm\": \"%s\", \"length\": %lu}\n",
+        nsecs - @start_time, pid, comm, $len);
+}
+
+tracepoint:syscalls:sys_enter_brk
+{
+    printf("{\"event\": \"brk\", \"timestamp\": %d, \"pid\": %d, \"comm\": \"%s\"}\n",
+        nsecs - @start_time, pid, comm);
+}
+
+tracepoint:syscalls:sys_enter_madvise
+{
+    $behavior = args->behavior;
+    printf("{\"event\": \"madvise\", \"timestamp\": %d, \"pid\": %d, \"comm\": \"%s\", \"behavior\": %d}\n",
+        nsecs - @start_time, pid, comm, $behavior);
+}
+
+END
+{
+    printf("{\"type\": \"trace_end\", \"timestamp\": %d}\n", nsecs);
+}

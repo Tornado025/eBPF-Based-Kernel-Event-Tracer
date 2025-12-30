@@ -1,0 +1,27 @@
+#!/usr/bin/env bpftrace
+/*
+Syscall Trace - Trace system calls with process information
+Outputs: timestamp, PID, process name, syscall name
+*/
+
+BEGIN
+{
+    @start_time = nsecs;
+    printf("{\"type\": \"trace_start\", \"timestamp\": %d}\n", @start_time);
+}
+
+tracepoint:raw_syscalls:sys_enter
+{
+    $uid = uid;
+    $pid = pid;
+    $comm = comm;
+    $syscall = args->id;
+    
+    printf("{\"event\": \"syscall\", \"timestamp\": %d, \"pid\": %d, \"uid\": %d, \"comm\": \"%s\", \"syscall_id\": %d}\n",
+        nsecs - @start_time, $pid, $uid, $comm, $syscall);
+}
+
+END
+{
+    printf("{\"type\": \"trace_end\", \"timestamp\": %d}\n", nsecs);
+}
