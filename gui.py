@@ -51,6 +51,10 @@ class EBPFRunner(QMainWindow):
         # We start the process differently to handle arguments cleanly
         self.process.start(program, args)
 
+    def handle_stdout(self):
+        data = self.process.readAllStandardOutput()
+        self.output_display.append(str(data.data(), "utf-8"))
+
     def handle_stderr(self):
         data = self.process.readAllStandardError()
         self.output_display.append(str(data.data(), "utf-8"))
