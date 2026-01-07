@@ -482,9 +482,11 @@ class EBPFRunner(QMainWindow):
 
         self.current_script = script_name
 
-        # Run the loader
-        program = "sudo"
-        args = ["./eBPF Scripts/user_loader", f"./eBPF Scripts/{script_name}.o"]
+        # Run the loader with bash -c to create a proper process group we can kill
+        # Use exec to replace the shell with the actual process
+        program = "bash"
+        command = f"exec sudo ./eBPF\\ Scripts/user_loader ./eBPF\\ Scripts/{script_name}.o"
+        args = ["-c", command]
         self.process.start(program, args)
 
     def stop_script(self):
@@ -493,44 +495,21 @@ class EBPFRunner(QMainWindow):
             self.status_label.setStyleSheet(
                 "padding: 8px; background-color: #fff3bf; border-radius: 5px; font-size: 12px;"
             )
-            # Get the process ID and send SIGINT (Ctrl+C) to it and its children
-            pid = self.process.processId()
-            if pid:
-                try:
-                    # Kill the entire process group (sudo and its children)
-                    os.killpg(os.getpgid(pid), signal.SIGINT)
-                except (OSError, ProcessLookupError):
-                    # If process group doesn't work, try direct terminate
-                    self.process.terminate()
-            else:
-                self.process.terminate()
-
+            # Just terminate - bash will forward the signal
+            self.process.terminate()
+    
     def force_kill_script(self):
         """Immediately kill the process with SIGKILL"""
         if self.process.state() == QProcess.ProcessState.Running:
             self.status_label.setText("Status: Force killing...")
+            # Use kill -9 through bash
             pid = self.process.processId()
             if pid:
-                try:
-                    # Kill the entire process group with SIGKILL
-                    os.killpg(os.getpgid(pid), signal.SIGKILL)
-                except (OSError, ProcessLookupError):
-                    self.process.kill()
-            else:
-                self.process.kill()
-
-    def closeEvent(self, event):
-        """Clean up processes before closing"""
-        if self.process.state() == QProcess.ProcessState.Running:
-            pid = self.process.processId()
-            if pid:
-                try:
-                    # Kill the entire process group
-                    os.killpg(os.getpgid(pid), signal.SIGKILL)
-                except (OSError, ProcessLookupError):
-                    self.process.kill()
-            else:
-                self.process.kill()
+                # Kill using system command to ensure it works
+                os.system(f"kill -9 {pid} 2>/dev/null")
+            self.process.kill()
+                os.system(f"kill -9 {pid} 2>/dev/null")
+            self.process.kill()
         event.accept()
 
     def update_ui_state(self):

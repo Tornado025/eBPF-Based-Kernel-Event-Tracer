@@ -167,13 +167,22 @@ int main(int argc, char **argv) {
     // Poll for events
     while (!exiting) {
         if (pb) {
+            // Use shorter timeout so we can exit faster
             err = perf_buffer__poll(pb, 100);
             if (err < 0 && err != -EINTR) {
                 fprintf(stderr, "Error polling perf buffer: %d\n", err);
                 break;
             }
         } else {
-            sleep(1);
+            // Sleep in small chunks to check exiting flag frequently
+            usleep(100000); // 100ms
+        }
+        
+        // Check if we should exit every iteration
+        if (exiting) {
+            printf("\nReceived signal, exiting...\n");
+            fflush(stdout);
+            break;
         }
     }
     
