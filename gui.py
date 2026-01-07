@@ -44,15 +44,12 @@ class EBPFRunner(QMainWindow):
         self.output_display.clear()
         self.output_display.append(f"Running {script_name}...")
 
-        # This assumes the compiled scripts are in the 'eBPF Scripts' directory
-        # and need to be run with sudo
-        command = f"sudo ./eBPF\ Scripts/{script_name}"
+        # Run the user_loader with the compiled object file
+        program = "sudo"
+        args = ["./eBPF Scripts/user_loader", f"./eBPF Scripts/{script_name}.o"]
 
-        self.process.start("bash", ["-c", command])
-
-    def handle_stdout(self):
-        data = self.process.readAllStandardOutput()
-        self.output_display.append(str(data.data(), "utf-8"))
+        # We start the process differently to handle arguments cleanly
+        self.process.start(program, args)
 
     def handle_stderr(self):
         data = self.process.readAllStandardError()
