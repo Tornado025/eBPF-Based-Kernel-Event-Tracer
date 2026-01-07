@@ -116,7 +116,6 @@ int main(int argc, char **argv) {
     map = bpf_object__find_map_by_name(obj, "events");
     if (map) {
         struct perf_buffer_opts pb_opts = {};
-        pb_opts.sz = sizeof(struct perf_buffer_opts);
         pb_opts.sample_cb = handle_event;
         pb_opts.lost_cb = handle_lost_events;
 
