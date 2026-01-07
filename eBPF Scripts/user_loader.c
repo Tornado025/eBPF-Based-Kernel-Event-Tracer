@@ -72,6 +72,9 @@ int main(int argc, char **argv) {
     // Set up libbpf errors and debug info callback
     libbpf_set_print(libbpf_print_fn);
     
+    // Make stdout line buffered so GUI sees output immediately
+    setvbuf(stdout, NULL, _IOLBF, 0);
+    
     // Bump RLIMIT_MEMLOCK to allow BPF sub-system to do anything
     struct rlimit rlim_new = {
         .rlim_cur = RLIM_INFINITY,
@@ -105,6 +108,7 @@ int main(int argc, char **argv) {
             start_time = time(NULL) * 1000000000ULL;  // nanoseconds
             bpf_map_update_elem(map_fd, &key, &start_time, BPF_ANY);
             printf("{\"type\": \"trace_start\", \"timestamp\": %llu}\n", start_time);
+            fflush(stdout);
         }
     }
     
@@ -114,9 +118,11 @@ int main(int argc, char **argv) {
         if (libbpf_get_error(link)) {
             fprintf(stderr, "Failed to attach BPF program '%s'\n",
                     bpf_program__name(prog));
+            fflush(stderr);
             goto cleanup;
         }
         printf("Attached program: %s\n", bpf_program__name(prog));
+        fflush(stdout);
     }
     
     // Set up perf buffer
@@ -139,6 +145,7 @@ int main(int argc, char **argv) {
     signal(SIGTERM, sig_handler);
     
     printf("Tracing... Press Ctrl+C to exit.\n");
+    fflush(stdout);
     
     // Poll for events
     while (!exiting) {

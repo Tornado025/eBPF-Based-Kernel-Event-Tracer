@@ -397,13 +397,15 @@ class EBPFRunner(QMainWindow):
         self.process.start(program, args)
 
     def stop_script(self):
-        if self.process.state() == QProcess.Running:
+        if self.process.state() == QProcess.ProcessState.Running:
             self.process.terminate()
+            # Give it 2 seconds to terminate gracefully
             if not self.process.waitForFinished(2000):
                 self.process.kill()
+                self.process.waitForFinished(1000)
 
     def update_ui_state(self):
-        is_running = self.process.state() == QProcess.Running
+        is_running = self.process.state() == QProcess.ProcessState.Running
         # Stop button should be ENABLED when running, disabled when not
         self.stop_button.setEnabled(is_running)
         # Start button should be ENABLED when not running, disabled when running
