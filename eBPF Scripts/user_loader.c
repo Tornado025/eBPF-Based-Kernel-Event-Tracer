@@ -94,13 +94,20 @@ int main(int argc, char **argv) {
     }
     
     // Load BPF program
+    printf("DEBUG: About to load BPF object...\n");
+    fflush(stdout);
     err = bpf_object__load(obj);
     if (err) {
         fprintf(stderr, "Failed to load BPF object: %d\n", err);
+        fflush(stderr);
         goto cleanup;
     }
+    printf("DEBUG: BPF object loaded successfully\n");
+    fflush(stdout);
     
     // Initialize start time in map
+    printf("DEBUG: Looking for start_time_map...\n");
+    fflush(stdout);
     map = bpf_object__find_map_by_name(obj, "start_time_map");
     if (map) {
         map_fd = bpf_map__fd(map);
@@ -113,19 +120,29 @@ int main(int argc, char **argv) {
     }
     
     // Attach all programs
+    printf("DEBUG: Starting program attachment...\n");
+    fflush(stdout);
     bpf_object__for_each_program(prog, obj) {
+        const char *prog_name = bpf_program__name(prog);
+        printf("DEBUG: Attempting to attach program: %s\n", prog_name);
+        fflush(stdout);
+        
         struct bpf_link *link = bpf_program__attach(prog);
         if (libbpf_get_error(link)) {
-            fprintf(stderr, "Failed to attach BPF program '%s'\n",
-                    bpf_program__name(prog));
+            fprintf(stderr, "Failed to attach BPF program '%s': %ld\n",
+                    prog_name, libbpf_get_error(link));
             fflush(stderr);
             goto cleanup;
         }
-        printf("Attached program: %s\n", bpf_program__name(prog));
+        printf("Attached program: %s\n", prog_name);
         fflush(stdout);
     }
+    printf("DEBUG: All programs attached successfully\n");
+    fflush(stdout);
     
     // Set up perf buffer
+    printf("DEBUG: Setting up perf buffer...\n");
+    fflush(stdout);
     map = bpf_object__find_map_by_name(obj, "events");
     if (map) {
         struct perf_buffer_opts pb_opts = {};
