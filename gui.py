@@ -410,20 +410,11 @@ class EBPFRunner(QMainWindow):
 
         self.stop_button = QPushButton("Stop")
         self.stop_button.setEnabled(False)
-        self.stop_button.clicked.connect(self.stop_script)
+        self.stop_button.clicked.connect(self.force_kill_script)
         self.stop_button.setStyleSheet(
             "background-color: #ff6b6b; color: white; padding: 10px; font-weight: bold;"
         )
         control_layout.addWidget(self.stop_button)
-
-        # Force kill button
-        self.kill_button = QPushButton("Force Kill")
-        self.kill_button.setEnabled(False)
-        self.kill_button.clicked.connect(self.force_kill_script)
-        self.kill_button.setStyleSheet(
-            "background-color: #c92a2a; color: white; padding: 10px;"
-        )
-        control_layout.addWidget(self.kill_button)
 
         # Quit button
         self.quit_button = QPushButton("Quit")
@@ -486,20 +477,9 @@ class EBPFRunner(QMainWindow):
         # Run the loader with bash -c to create a proper process group we can kill
         # Use exec to replace the shell with the actual process
         program = "bash"
-        command = (
-            f"exec sudo ./eBPF\\ Scripts/user_loader ./eBPF\\ Scripts/{script_name}.o"
-        )
+        command = f"exec sudo ./ebpf/user_loader ./ebpf/{script_name}.o"
         args = ["-c", command]
         self.process.start(program, args)
-
-    def stop_script(self):
-        if self.process.state() == QProcess.ProcessState.Running:
-            self.status_label.setText("Status: Stopping...")
-            self.status_label.setStyleSheet(
-                "padding: 8px; background-color: #fff3bf; border-radius: 5px; font-size: 12px;"
-            )
-            # Just terminate - bash will forward the signal
-            self.process.terminate()
 
     def force_kill_script(self):
         """Immediately kill the process with SIGKILL"""
@@ -523,9 +503,8 @@ class EBPFRunner(QMainWindow):
 
     def update_ui_state(self):
         is_running = self.process.state() == QProcess.ProcessState.Running
-        # Stop and kill buttons enabled when running
+        # Stop button enabled when running
         self.stop_button.setEnabled(is_running)
-        self.kill_button.setEnabled(is_running)
         # Start button enabled when not running
         self.start_button.setEnabled(not is_running)
 
