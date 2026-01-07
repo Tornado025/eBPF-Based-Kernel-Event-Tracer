@@ -115,7 +115,12 @@ int main(int argc, char **argv) {
     // Set up perf buffer
     map = bpf_object__find_map_by_name(obj, "events");
     if (map) {
-        pb = perf_buffer__new(bpf_map__fd(map), 8, handle_event, handle_lost_events, NULL, NULL);
+        struct perf_buffer_opts pb_opts = {};
+        pb_opts.sz = sizeof(struct perf_buffer_opts);
+        pb_opts.sample_cb = handle_event;
+        pb_opts.lost_cb = handle_lost_events;
+
+        pb = perf_buffer__new(bpf_map__fd(map), 8, &pb_opts);
         if (libbpf_get_error(pb)) {
             fprintf(stderr, "Failed to create perf buffer\n");
             err = -1;
