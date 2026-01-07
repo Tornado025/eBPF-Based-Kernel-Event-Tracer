@@ -1,5 +1,5 @@
-import os
 import json
+import os
 import sys
 from collections import defaultdict, deque
 
@@ -486,7 +486,9 @@ class EBPFRunner(QMainWindow):
         # Run the loader with bash -c to create a proper process group we can kill
         # Use exec to replace the shell with the actual process
         program = "bash"
-        command = f"exec sudo ./eBPF\\ Scripts/user_loader ./eBPF\\ Scripts/{script_name}.o"
+        command = (
+            f"exec sudo ./eBPF\\ Scripts/user_loader ./eBPF\\ Scripts/{script_name}.o"
+        )
         args = ["-c", command]
         self.process.start(program, args)
 
@@ -498,7 +500,7 @@ class EBPFRunner(QMainWindow):
             )
             # Just terminate - bash will forward the signal
             self.process.terminate()
-    
+
     def force_kill_script(self):
         """Immediately kill the process with SIGKILL"""
         if self.process.state() == QProcess.ProcessState.Running:
@@ -509,6 +511,12 @@ class EBPFRunner(QMainWindow):
                 # Kill using system command to ensure it works
                 os.system(f"kill -9 {pid} 2>/dev/null")
             self.process.kill()
+
+    def closeEvent(self, event):
+        """Clean up processes before closing"""
+        if self.process.state() == QProcess.ProcessState.Running:
+            pid = self.process.processId()
+            if pid:
                 os.system(f"kill -9 {pid} 2>/dev/null")
             self.process.kill()
         event.accept()
