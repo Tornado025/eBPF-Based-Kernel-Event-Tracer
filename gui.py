@@ -70,6 +70,15 @@ class DashboardTab(QWidget):
         # Log output at bottom
         log_group = QGroupBox("Event Log")
         log_layout = QVBoxLayout()
+
+        # Add copy button for logs
+        log_controls = QHBoxLayout()
+        self.copy_log_btn = QPushButton("Copy Logs")
+        self.copy_log_btn.clicked.connect(self.copy_logs)
+        log_controls.addWidget(self.copy_log_btn)
+        log_controls.addStretch()
+        log_layout.addLayout(log_controls)
+
         self.log_output = QTextEdit()
         self.log_output.setReadOnly(True)
         self.log_output.setMaximumHeight(150)
@@ -79,6 +88,10 @@ class DashboardTab(QWidget):
 
     def add_chart(self, chart, row, col):
         self.grid_layout.addWidget(chart, row, col)
+
+    def copy_logs(self):
+        clipboard = QApplication.clipboard()
+        clipboard.setText(self.log_output.toPlainText())
 
     def process_data(self, data_obj):
         """Override in subclasses"""
@@ -324,43 +337,58 @@ class EBPFRunner(QMainWindow):
         control_label.setStyleSheet("font-weight: bold; font-size: 14px;")
         control_layout.addWidget(control_label)
 
-        self.start_file_btn = QPushButton("Start File Access")
-        self.start_file_btn.clicked.connect(lambda: self.run_script("file_access", 0))
-        control_layout.addWidget(self.start_file_btn)
-
-        self.start_memory_btn = QPushButton("Start Memory Trace")
-        self.start_memory_btn.clicked.connect(
-            lambda: self.run_script("memory_trace", 1)
+        # Current tab label
+        self.current_tab_label = QLabel("Selected: File Access")
+        self.current_tab_label.setStyleSheet(
+            "padding: 10px; background-color: #f0f0f0; border-radius: 5px;"
         )
-        control_layout.addWidget(self.start_memory_btn)
+        control_layout.addWidget(self.current_tab_label)
 
-        self.start_syscall_btn = QPushButton("Start Syscall Trace")
-        self.start_syscall_btn.clicked.connect(
-            lambda: self.run_script("syscall_trace", 2)
+        # Single start button that works with current tab
+        self.start_button = QPushButton("Start")
+        self.start_button.clicked.connect(self.start_current_script)
+        self.start_button.setStyleSheet(
+            "background-color: #51cf66; color: white; padding: 10px; font-weight: bold;"
         )
-        control_layout.addWidget(self.start_syscall_btn)
+        control_layout.addWidget(self.start_button)
 
         self.stop_button = QPushButton("Stop")
         self.stop_button.setEnabled(False)
         self.stop_button.clicked.connect(self.stop_script)
-        self.stop_button.setStyleSheet("background-color: #ff6b6b; color: white;")
+        self.stop_button.setStyleSheet(
+            "background-color: #ff6b6b; color: white; padding: 10px; font-weight: bold;"
+        )
         control_layout.addWidget(self.stop_button)
+
+        # Quit button
+        self.quit_button = QPushButton("Quit")
+        self.quit_button.clicked.connect(self.close)
+        self.quit_button.setStyleSheet("padding: 10px; margin-top: 20px;")
+        control_layout.addWidget(self.quit_button)
 
         control_layout.addStretch()
 
+        # Connect tab change to update label
+        self.tabs.currentChanged.connect(self.update_current_tab_label)
+
         main_layout.addLayout(control_layout, stretch=1)
 
-    def run_script(self, script_name, tab_index):
-        # Clear the appropriate tab
-        if tab_index == 0:
-            self.file_tab.clear_data()
-        elif tab_index == 1:
-            self.memory_tab.clear_data()
-        elif tab_index == 2:
-            self.syscall_tab.clear_data()
+    def update_current_tab_label(self):
+        tab_names = ["File Access", "Memory Trace", "Syscall Trace"]
+        current_index = self.tabs.currentIndex()
+        self.current_tab_label.setText(f"Selected: {tab_names[current_index]}")
 
-        # Switch to the tab
-        self.tabs.setCurrentIndex(tab_index)
+    def start_current_script(self):
+        # Get script name based on current tab
+        script_names = ["file_access", "memory_trace", "syscall_trace"]
+        current_index = self.tabs.currentIndex()
+        script_name = script_names[current_index]
+
+        # Clear current tab
+        current_tab = self.tabs.currentWidget()
+        if current_tab:
+            current_tab.clear_data()
+
         self.current_script = script_name
 
         # Run the loader
@@ -376,35 +404,57 @@ class EBPFRunner(QMainWindow):
 
     def update_ui_state(self):
         is_running = self.process.state() == QProcess.Running
+        # Stop button should be ENABLED when running, disabled when not
         self.stop_button.setEnabled(is_running)
-        self.start_file_btn.setEnabled(not is_running)
-        self.start_memory_btn.setEnabled(not is_running)
-        self.start_syscall_btn.setEnabled(not is_running)
+        # Start button should be ENABLED when not running, disabled when running
+        self.start_button.setEnabled(not is_running)
 
     def handle_stdout(self):
         data = self.process.readAllStandardOutput()
         text = str(data.data(), "utf-8")
 
+        # Get the tab that started the script, not necessarily the current one
+        script_names = ["file_access", "memory_trace", "syscall_trace"]
+        tabs = [self.file_tab, self.memory_tab, self.syscall_tab]
+
+        try:
+            script_index = script_names.index(self.current_script)
+            target_tab = tabs[script_index]
+        except (ValueError, AttributeError):
+            target_tab = self.tabs.currentWidget()
+
         for line in text.strip().split("\n"):
             if not line:
                 continue
+
+            # Always show in log first
+            if hasattr(target_tab, "log_output"):
+                target_tab.log_output.append(line)
+
             try:
                 data_obj = json.loads(line)
-                current_tab = self.tabs.currentWidget()
-                if current_tab:
-                    current_tab.process_data(data_obj)
+                if target_tab:
+                    target_tab.process_data(data_obj)
             except json.JSONDecodeError:
-                # Not JSON, just display as text
-                current_tab = self.tabs.currentWidget()
-                if hasattr(current_tab, "log_output"):
-                    current_tab.log_output.append(line)
+                # Already appended to log above
+                pass
 
     def handle_stderr(self):
         data = self.process.readAllStandardError()
         text = str(data.data(), "utf-8")
-        current_tab = self.tabs.currentWidget()
-        if hasattr(current_tab, "log_output"):
-            current_tab.log_output.append(f"ERROR: {text}")
+
+        # Route to the tab that started the script
+        script_names = ["file_access", "memory_trace", "syscall_trace"]
+        tabs = [self.file_tab, self.memory_tab, self.syscall_tab]
+
+        try:
+            script_index = script_names.index(self.current_script)
+            target_tab = tabs[script_index]
+        except (ValueError, AttributeError):
+            target_tab = self.tabs.currentWidget()
+
+        if hasattr(target_tab, "log_output"):
+            target_tab.log_output.append(f"ERROR: {text}")
 
 
 if __name__ == "__main__":
