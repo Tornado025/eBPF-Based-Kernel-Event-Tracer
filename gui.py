@@ -404,6 +404,15 @@ class EBPFRunner(QMainWindow):
                 self.process.kill()
                 self.process.waitForFinished(1000)
 
+    def closeEvent(self, event):
+        """Clean up processes before closing"""
+        if self.process.state() == QProcess.ProcessState.Running:
+            self.process.terminate()
+            if not self.process.waitForFinished(2000):
+                self.process.kill()
+                self.process.waitForFinished(1000)
+        event.accept()
+
     def update_ui_state(self):
         is_running = self.process.state() == QProcess.ProcessState.Running
         # Stop button should be ENABLED when running, disabled when not
