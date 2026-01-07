@@ -38,13 +38,20 @@ static int perf_event_open(struct perf_event_attr *attr, int pid, int cpu, int g
 
 // Handle perf event data
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz) {
-    // This is a generic handler - specific event structures would be defined
-    // based on the eBPF program being loaded
-    // printf("Event received: cpu=%d, size=%d\n", cpu, data_sz);
+    // Basic hex dump of the data structure, prefixed with JSON marker for the GUI
+    printf("{\"type\": \"data\", \"cpu\": %d, \"size\": %d, \"hex\": \"", cpu, data_sz);
+    unsigned char *p = (unsigned char *)data;
+    for (int i = 0; i < data_sz; i++) {
+        printf("%02x", p[i]);
+    }
+    printf("\"}\n");
+    // Ensure stdout is flushed so the GUI gets it immediately
+    fflush(stdout);
 }
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt) {
-    fprintf(stderr, "Lost %llu events on CPU %d\n", lost_cnt, cpu);
+    printf("{\"type\": \"error\", \"msg\": \"Lost %llu events on CPU %d\"}\n", lost_cnt, cpu);
+    fflush(stdout);
 }
 
 int main(int argc, char **argv) {
