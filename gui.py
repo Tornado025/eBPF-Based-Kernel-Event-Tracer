@@ -493,28 +493,44 @@ class EBPFRunner(QMainWindow):
             self.status_label.setStyleSheet(
                 "padding: 8px; background-color: #fff3bf; border-radius: 5px; font-size: 12px;"
             )
-            # Send SIGTERM
-            self.process.terminate()
-            # Give it 1 second (reduced from 2)
-            if not self.process.waitForFinished(1000):
-                # If still running, kill it
-                self.process.kill()
-                self.process.waitForFinished(500)
+            # Get the process ID and send SIGINT (Ctrl+C) to it and its children
+            pid = self.process.processId()
+            if pid:
+                try:
+                    # Kill the entire process group (sudo and its children)
+                    os.killpg(os.getpgid(pid), signal.SIGINT)
+                except (OSError, ProcessLookupError):
+                    # If process group doesn't work, try direct terminate
+                    self.process.terminate()
+            else:
+                self.process.terminate()
 
     def force_kill_script(self):
         """Immediately kill the process with SIGKILL"""
         if self.process.state() == QProcess.ProcessState.Running:
             self.status_label.setText("Status: Force killing...")
-            self.process.kill()
-            self.process.waitForFinished(500)
+            pid = self.process.processId()
+            if pid:
+                try:
+                    # Kill the entire process group with SIGKILL
+                    os.killpg(os.getpgid(pid), signal.SIGKILL)
+                except (OSError, ProcessLookupError):
+                    self.process.kill()
+            else:
+                self.process.kill()
 
     def closeEvent(self, event):
         """Clean up processes before closing"""
         if self.process.state() == QProcess.ProcessState.Running:
-            self.process.terminate()
-            if not self.process.waitForFinished(2000):
+            pid = self.process.processId()
+            if pid:
+                try:
+                    # Kill the entire process group
+                    os.killpg(os.getpgid(pid), signal.SIGKILL)
+                except (OSError, ProcessLookupError):
+                    self.process.kill()
+            else:
                 self.process.kill()
-                self.process.waitForFinished(1000)
         event.accept()
 
     def update_ui_state(self):
