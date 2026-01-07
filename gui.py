@@ -142,20 +142,24 @@ class FileAccessTab(DashboardTab):
             )
             self.chart1.plot_widget.setLabel("left", "Total Operations")
             self.chart1.plot_widget.setLabel("bottom", "Time (events)")
-            
+
             # Update Chart 2: Operations by type (just show total for now)
             self.chart2.clear()
             if len(self.time_data) > 1:
                 rate = len(self.time_data)
-                self.chart2.plot_widget.plot([0, 1], [rate, rate], pen=pg.mkPen("g", width=2))
+                self.chart2.plot_widget.plot(
+                    [0, 1], [rate, rate], pen=pg.mkPen("g", width=2)
+                )
                 self.chart2.plot_widget.setLabel("left", "Total Count")
-            
+
             # Update Chart 3: Event rate over time
             self.chart3.clear()
             if len(self.time_data) > 5:
                 # Calculate simple rate (events per time window)
                 rates = [1] * len(self.time_data)  # Simple: 1 event per timestamp
-                self.chart3.plot_widget.plot(self.time_data, rates, pen=pg.mkPen("r", width=2))
+                self.chart3.plot_widget.plot(
+                    self.time_data, rates, pen=pg.mkPen("r", width=2)
+                )
                 self.chart3.plot_widget.setLabel("left", "Rate (ops/time)")
                 self.chart3.plot_widget.setLabel("bottom", "Time")
 
@@ -235,13 +239,19 @@ class MemoryTraceTab(DashboardTab):
             self.chart3.plot_widget.addItem(bg)
             self.chart3.plot_widget.setLabel("left", "Events")
             self.chart3.plot_widget.setLabel("bottom", "CPU")
-            
+
             # Chart 4: Event rate (simple moving average)
             self.chart4.clear()
             if len(self.time_data) > 5:
                 window = 5
-                rates = [sum(self.event_sizes[max(0,i-window):i+1])/(min(i+1, window)) for i in range(len(self.event_sizes))]
-                self.chart4.plot_widget.plot(self.time_data, rates, pen=pg.mkPen("orange", width=2))
+                rates = [
+                    sum(self.event_sizes[max(0, i - window) : i + 1])
+                    / (min(i + 1, window))
+                    for i in range(len(self.event_sizes))
+                ]
+                self.chart4.plot_widget.plot(
+                    self.time_data, rates, pen=pg.mkPen("orange", width=2)
+                )
                 self.chart4.plot_widget.setLabel("left", "Avg Size (bytes)")
                 self.chart4.plot_widget.setLabel("bottom", "Time")
 
@@ -311,12 +321,14 @@ class SyscallTraceTab(DashboardTab):
             self.chart3.plot_widget.addItem(bg)
             self.chart3.plot_widget.setLabel("left", "Syscalls")
             self.chart3.plot_widget.setLabel("bottom", "CPU")
-            
+
             # Chart 4: Activity heatmap (just show cumulative count)
             self.chart4.clear()
             if len(self.time_data) > 0:
                 cumulative = list(range(1, len(self.time_data) + 1))
-                self.chart4.plot_widget.plot(self.time_data, cumulative, pen=pg.mkPen("purple", width=2))
+                self.chart4.plot_widget.plot(
+                    self.time_data, cumulative, pen=pg.mkPen("purple", width=2)
+                )
                 self.chart4.plot_widget.setLabel("left", "Cumulative Syscalls")
                 self.chart4.plot_widget.setLabel("bottom", "Time")
 
@@ -372,7 +384,7 @@ class EBPFRunner(QMainWindow):
         control_label = QLabel("Control Panel")
         control_label.setStyleSheet("font-weight: bold; font-size: 14px;")
         control_layout.addWidget(control_label)
-        
+
         # Status indicator
         self.status_label = QLabel("Status: Idle")
         self.status_label.setStyleSheet(
@@ -402,7 +414,7 @@ class EBPFRunner(QMainWindow):
             "background-color: #ff6b6b; color: white; padding: 10px; font-weight: bold;"
         )
         control_layout.addWidget(self.stop_button)
-        
+
         # Force kill button
         self.kill_button = QPushButton("Force Kill")
         self.kill_button.setEnabled(False)
@@ -430,13 +442,13 @@ class EBPFRunner(QMainWindow):
         self.status_label.setStyleSheet(
             "padding: 8px; background-color: #d3f9d8; border-radius: 5px; font-size: 12px; color: #2b8a3e;"
         )
-    
+
     def on_process_finished(self, exit_code, exit_status):
         self.status_label.setText(f"Status: Stopped (exit: {exit_code})")
         self.status_label.setStyleSheet(
             "padding: 8px; background-color: #fff3bf; border-radius: 5px; font-size: 12px;"
         )
-    
+
     def on_process_error(self, error):
         error_messages = {
             QProcess.ProcessError.FailedToStart: "Failed to start",
@@ -451,7 +463,7 @@ class EBPFRunner(QMainWindow):
         self.status_label.setStyleSheet(
             "padding: 8px; background-color: #ffe3e3; border-radius: 5px; font-size: 12px; color: #c92a2a;"
         )
-    
+
     def update_current_tab_label(self):
         tab_names = ["File Access", "Memory Trace", "Syscall Trace"]
         current_index = self.tabs.currentIndex()
@@ -488,7 +500,7 @@ class EBPFRunner(QMainWindow):
                 # If still running, kill it
                 self.process.kill()
                 self.process.waitForFinished(500)
-    
+
     def force_kill_script(self):
         """Immediately kill the process with SIGKILL"""
         if self.process.state() == QProcess.ProcessState.Running:
@@ -512,7 +524,7 @@ class EBPFRunner(QMainWindow):
         self.kill_button.setEnabled(is_running)
         # Start button enabled when not running
         self.start_button.setEnabled(not is_running)
-        
+
         if not is_running and self.status_label.text() == "Status: Idle":
             self.status_label.setStyleSheet(
                 "padding: 8px; background-color: #f8f9fa; border-radius: 5px; font-size: 12px;"
