@@ -1,0 +1,21 @@
+[project]
+name = "os-el"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Ranjith RD",email = "ranjithrd03@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.12,<3.15"
+dependencies = [
+    "pyside6 (>=6.10.1,<7.0.0)",
+    "pyqtgraph (>=0.14.0,<0.15.0)"
+]
+
+# poetry tool package mode configuration
+[tool.poetry]
+package-mode = false
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

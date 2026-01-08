@@ -38,13 +38,20 @@ static int perf_event_open(struct perf_event_attr *attr, int pid, int cpu, int g
 
 // Handle perf event data
 static void handle_event(void *ctx, int cpu, void *data, __u32 data_sz) {
-    // This is a generic handler - specific event structures would be defined
-    // based on the eBPF program being loaded
-    // printf("Event received: cpu=%d, size=%d\n", cpu, data_sz);
+    // Basic hex dump of the data structure, prefixed with JSON marker for the GUI
+    printf("{\"type\": \"data\", \"cpu\": %d, \"size\": %d, \"hex\": \"", cpu, data_sz);
+    unsigned char *p = (unsigned char *)data;
+    for (int i = 0; i < data_sz; i++) {
+        printf("%02x", p[i]);
+    }
+    printf("\"}\n");
+    // Ensure stdout is flushed so the GUI gets it immediately
+    fflush(stdout);
 }
 
 static void handle_lost_events(void *ctx, int cpu, __u64 lost_cnt) {
-    fprintf(stderr, "Lost %llu events on CPU %d\n", lost_cnt, cpu);
+    printf("{\"type\": \"error\", \"msg\": \"Lost %llu events on CPU %d\"}\n", lost_cnt, cpu);
+    fflush(stdout);
 }
 
 int main(int argc, char **argv) {
@@ -65,6 +72,9 @@ int main(int argc, char **argv) {
     // Set up libbpf errors and debug info callback
     libbpf_set_print(libbpf_print_fn);
     
+    // Make stdout line buffered so GUI sees output immediately
+    setvbuf(stdout, NULL, _IOLBF, 0);
+    
     // Bump RLIMIT_MEMLOCK to allow BPF sub-system to do anything
     struct rlimit rlim_new = {
         .rlim_cur = RLIM_INFINITY,
@@ -84,13 +94,20 @@ int main(int argc, char **argv) {
     }
     
     // Load BPF program
+    printf("DEBUG: About to load BPF object...\n");
+    fflush(stdout);
     err = bpf_object__load(obj);
     if (err) {
         fprintf(stderr, "Failed to load BPF object: %d\n", err);
+        fflush(stderr);
         goto cleanup;
     }
+    printf("DEBUG: BPF object loaded successfully\n");
+    fflush(stdout);
     
     // Initialize start time in map
+    printf("DEBUG: Looking for start_time_map...\n");
+    fflush(stdout);
     map = bpf_object__find_map_by_name(obj, "start_time_map");
     if (map) {
         map_fd = bpf_map__fd(map);
@@ -98,24 +115,41 @@ int main(int argc, char **argv) {
             start_time = time(NULL) * 1000000000ULL;  // nanoseconds
             bpf_map_update_elem(map_fd, &key, &start_time, BPF_ANY);
             printf("{\"type\": \"trace_start\", \"timestamp\": %llu}\n", start_time);
+            fflush(stdout);
         }
     }
     
     // Attach all programs
+    printf("DEBUG: Starting program attachment...\n");
+    fflush(stdout);
     bpf_object__for_each_program(prog, obj) {
+        const char *prog_name = bpf_program__name(prog);
+        printf("DEBUG: Attempting to attach program: %s\n", prog_name);
+        fflush(stdout);
+        
         struct bpf_link *link = bpf_program__attach(prog);
         if (libbpf_get_error(link)) {
-            fprintf(stderr, "Failed to attach BPF program '%s'\n",
-                    bpf_program__name(prog));
+            fprintf(stderr, "Failed to attach BPF program '%s': %ld\n",
+                    prog_name, libbpf_get_error(link));
+            fflush(stderr);
             goto cleanup;
         }
-        printf("Attached program: %s\n", bpf_program__name(prog));
+        printf("Attached program: %s\n", prog_name);
+        fflush(stdout);
     }
+    printf("DEBUG: All programs attached successfully\n");
+    fflush(stdout);
     
     // Set up perf buffer
+    printf("DEBUG: Setting up perf buffer...\n");
+    fflush(stdout);
     map = bpf_object__find_map_by_name(obj, "events");
     if (map) {
-        pb = perf_buffer__new(bpf_map__fd(map), 8, handle_event, handle_lost_events, NULL, NULL);
+        struct perf_buffer_opts pb_opts = {};
+        pb_opts.sample_cb = handle_event;
+        pb_opts.lost_cb = handle_lost_events;
+
+        pb = perf_buffer__new(bpf_map__fd(map), 8, &pb_opts);
         if (libbpf_get_error(pb)) {
             fprintf(stderr, "Failed to create perf buffer\n");
             err = -1;
@@ -128,17 +162,27 @@ int main(int argc, char **argv) {
     signal(SIGTERM, sig_handler);
     
     printf("Tracing... Press Ctrl+C to exit.\n");
+    fflush(stdout);
     
     // Poll for events
     while (!exiting) {
         if (pb) {
+            // Use shorter timeout so we can exit faster
             err = perf_buffer__poll(pb, 100);
             if (err < 0 && err != -EINTR) {
                 fprintf(stderr, "Error polling perf buffer: %d\n", err);
                 break;
             }
         } else {
-            sleep(1);
+            // Sleep in small chunks to check exiting flag frequently
+            usleep(100000); // 100ms
+        }
+        
+        // Check if we should exit every iteration
+        if (exiting) {
+            printf("\nReceived signal, exiting...\n");
+            fflush(stdout);
+            break;
         }
     }
     
